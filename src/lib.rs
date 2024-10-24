@@ -1,3 +1,5 @@
+//! Async driver for SSD1331-based displays with SPI interface.
+
 #![no_std]
 
 use command::Command;
@@ -16,7 +18,7 @@ pub use rgb332::Rgb332;
 pub const DISPLAY_WIDTH: u32 = 96;
 pub const DISPLAY_HEIGHT: u32 = 64;
 
-/// Number of bits per pixel.
+/// Bits per pixel.
 ///
 /// The display internally supports BGR order and alternative 16-bit color
 /// mode, but this driver does not, so effectively U8 is Rgb332 and U16 is
@@ -156,8 +158,7 @@ impl<T, X> From<T> for Error<T, X> {
     }
 }
 
-/// Async SPI driver for displays based on SSD1331 controller.
-///
+/// Async driver for SSD1331-based displays with SPI interface.
 ///
 /// Can be used with [`embedded-graphics`] crate in async frameworks (e.g.
 /// Embassy). Since the `embedded-graphics` API is synchronous, the driver
@@ -167,7 +168,7 @@ impl<T, X> From<T> for Error<T, X> {
 /// a sub-area of the display; for example, it's possible to draw monospaced
 /// text one character at a time, or mix text and graphics areas.
 ///
-/// The driver dutifully propagates the errors from the HAL, but the display
+/// The driver dutifully propagates all errors from the HAL, but the display
 /// controller is stateful and the driver doesn't attempt to return it to a
 /// known good state after an error. You can call `init()` to hard-reset the
 /// display and reinitialize the driver after an error.
@@ -204,11 +205,8 @@ where
 {
     /// Creates a new driver instance and initializes the display.
     ///
-    /// TODO: if this fails, it eats the peripherals. Maybe return them?
-    ///
     /// Requires GPIO output pins connected to RST and DC pins on the display,
-    /// and a SPI device with MOSI and SCK connected to the display. This
-    /// display doesn't allow to read RAM through SPI, so MISO is not needed.
+    /// and a SPI device with SDO and SCK outputs connected to the display. 
     /// The CS (chip select) pin of the display can be controlled by the SPI
     /// device, or you can simply tie it low, and pass a DummyPin to the SPI
     /// device. SPI bus should be configured to MODE_0, MSB first (usually the
@@ -275,7 +273,7 @@ where
         Ok(())
     }
 
-    /// Returns the peripherals to you.
+    /// Consumes the driver and returns the peripherals to you.
     pub fn release(self) -> (RST, DC, SPI) {
         (self.rst, self.dc, self.spi)
     }
