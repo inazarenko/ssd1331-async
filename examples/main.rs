@@ -29,9 +29,11 @@ use defmt::error;
 use embassy_executor::Spawner;
 use embassy_stm32::{gpio, spi};
 use embassy_time::{Delay, Duration, Timer};
-use embedded_graphics::prelude::*;
+use embedded_graphics::{prelude::*, primitives::Rectangle};
 use embedded_hal_bus::spi::ExclusiveDevice;
-use ssd1331_async::{Config, Framebuffer, Rgb332, Ssd1331, DISPLAY_HEIGHT, DISPLAY_WIDTH};
+use ssd1331_async::{
+    ColorMode, Config, Ssd1331, DISPLAY_HEIGHT, DISPLAY_WIDTH,
+};
 use static_cell::ConstStaticCell;
 
 use {defmt_rtt as _, panic_probe as _};
@@ -81,12 +83,22 @@ async fn main(_spawner: Spawner) {
             .unwrap()
     };
 
-    let pixel_data = PIXEL_DATA.take();
+    let img = include_bytes!("./img.raw");
+    display
+        .write_data(
+            img,
+            ColorMode::U16,
+            Rectangle::new(Point::new(32, 0), Size::new(64, 64)),
+        )
+        .await
+        .unwrap();
 
-    let mut fb = Framebuffer::<Rgb332>::new(pixel_data, display.size());
-    fb.clear(Rgb332::new(0, 0, 1)).unwrap();
+    // let pixel_data = PIXEL_DATA.take();
 
-    display.write_all(&fb).await.unwrap();
+    // let mut fb = Framebuffer::<Rgb332>::new(pixel_data, display.size());
+    // fb.clear(Rgb332::new(0, 0, 1)).unwrap();
+
+    // display.write_all(&fb).await.unwrap();
 
     loop {
         Timer::after(Duration::from_millis(1000)).await;

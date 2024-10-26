@@ -196,9 +196,9 @@ pub struct Ssd1331<RST, DC, SPI> {
 impl<RST, DC, SPI> OriginDimensions for Ssd1331<RST, DC, SPI> {
     fn size(&self) -> Size {
         if self.data_mapping.pixel_order == PixelOrder::RowMajor {
-            Size::new(DISPLAY_WIDTH as u32, DISPLAY_HEIGHT as u32)
+            Size::new(DISPLAY_WIDTH, DISPLAY_HEIGHT)
         } else {
-            Size::new(DISPLAY_HEIGHT as u32, DISPLAY_WIDTH as u32)
+            Size::new(DISPLAY_HEIGHT, DISPLAY_WIDTH)
         }
     }
 }
@@ -254,7 +254,7 @@ where
 
         self.area = Rectangle::new(
             Point::zero(),
-            Size::new(DISPLAY_WIDTH as u32, DISPLAY_HEIGHT as u32),
+            Size::new(DISPLAY_WIDTH, DISPLAY_HEIGHT),
         );
         self.color_mode = ColorMode::U16;
 

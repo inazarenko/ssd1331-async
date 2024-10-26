@@ -80,7 +80,7 @@ where
             if x >= self.size.width as usize || y >= self.size.height as usize {
                 continue;
             }
-            let offset = (y * self.size.width as usize + x) as usize * Self::BYTES_PER_PIXEL;
+            let offset = (y * self.size.width as usize + x) * Self::BYTES_PER_PIXEL;
             self.data[offset..offset + Self::BYTES_PER_PIXEL]
                 .copy_from_slice(p.1.to_be_bytes().as_ref());
         }
