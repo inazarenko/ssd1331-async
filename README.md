@@ -1,4 +1,7 @@
+
 # Rust async driver for SSD1331-based displays
+[![Crates.io](https://img.shields.io/crates/v/ssd1331-async.svg)](https://crates.io/crates/ssd1331-async)
+[![Docs.rs](https://docs.rs/ssd1331-async/badge.svg)](https://docs.rs/ssd1331-async)
 
 Uses `embedded-hal(-async)` to communicate with the display. Provides methods
 to initialize the display and to send pixel data from the MCU to the
