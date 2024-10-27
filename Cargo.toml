@@ -1,5 +1,10 @@
 [package]
 name = "ssd1331-async"
+categories = ["embedded", "no-std"]
+keywords = ["no-std", "ssd1331", "embedded"]
+description = "Async driver for SSD1331-based displays with SPI interface."
+license = "Apache-2.0"
+repository = "https://github.com/inazarenko/ssd1331-async"
 version = "0.1.0"
 edition = "2021"
 
