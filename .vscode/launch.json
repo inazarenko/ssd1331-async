@@ -1,0 +1,17 @@
+{
+    "configurations": [
+        {
+            "name": "cortex-debug",
+            "servertype": "openocd",
+            "serverpath": "../openocd/bin/openocd",
+            "type": "cortex-debug",
+            "svdFile": "./svd/STM32F103.svd",
+            "executable": "./target/thumbv7m-none-eabi/debug/examples/main",
+            "searchDir": ["../openocd/share/openocd/scripts"],
+            "configFiles": ["interface/stlink.cfg", "board/stm32f103c8_blue_pill.cfg"],
+            "openOCDLaunchCommands": [],
+            "gdbTarget": "localhost:3333",
+            "request": "attach",
+        }
+    ]
+}

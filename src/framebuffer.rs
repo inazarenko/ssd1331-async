@@ -4,7 +4,7 @@ use embedded_graphics_core::{
     Pixel,
 };
 
-use crate::ColorMode;
+use crate::BitDepth;
 
 /// Memory buffer that can serve as a [`DrawTarget`].
 ///
@@ -38,10 +38,10 @@ where
         s
     }
 
-    pub const fn color_mode(&self) -> ColorMode {
+    pub const fn bit_depth(&self) -> BitDepth {
         match Self::BYTES_PER_PIXEL {
-            1 => ColorMode::U8,
-            2 => ColorMode::U16,
+            1 => BitDepth::Eight,
+            2 => BitDepth::Sixteen,
             _ => panic!(),
         }
     }

@@ -4,11 +4,14 @@
 /// Waples and contributors.
 ///
 /// [ssd1331]:  https://github.com/rust-embedded-community/ssd1331
-
-use embedded_graphics_core::{pixelcolor::Rgb565, prelude::{Point, RgbColor}, primitives::Rectangle};
+use embedded_graphics_core::{
+    pixelcolor::Rgb565,
+    prelude::{Point, RgbColor},
+    primitives::Rectangle,
+};
 use heapless::Vec;
 
-use crate::{ColorMode, Config};
+use crate::{BitDepth, Config};
 
 #[allow(dead_code)]
 #[derive(Clone, Copy)]
@@ -20,7 +23,7 @@ pub(crate) enum Command {
     /// Turn display on or off.
     DisplayOn(bool),
     /// Set mapping between the incoming data and the display pixels.
-    RemapAndColorDepth(Config, ColorMode),
+    RemapAndBitDepth(Config, BitDepth),
     /// Fill the given window of RAM with zeros. The rectangle is in RAM
     /// coordinates; that is, the max X is 96 even when the display is in
     /// column-major mode. Internally, the display controller needs time
@@ -51,7 +54,7 @@ impl Command {
             &Command::MasterCurrent(current) => &[0x87, current.min(15)],
             &Command::Contrast(r, g, b) => &[0x81, r, 0x82, g, 0x83, b] as &[u8],
             &Command::DisplayOn(on) => &[0xAE | (on as u8)],
-            &Command::RemapAndColorDepth(dm, cm) => &[
+            &Command::RemapAndBitDepth(dm, cm) => &[
                 0xA0,
                 (dm.row_direction as u8)
                     | (dm.row_interleave as u8)

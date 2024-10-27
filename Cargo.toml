@@ -45,3 +45,7 @@ static_cell = "2.1.0"
 
 [profile.release]
 debug = true
+
+[profile.dev.package."*"]
+opt-level = "s"
+codegen-units = 1

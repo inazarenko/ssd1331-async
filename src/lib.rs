@@ -24,22 +24,22 @@ pub const DISPLAY_HEIGHT: u32 = 64;
 /// Number of bits per pixel in a data transfer.
 ///
 /// The display internally supports BGR order and alternative 16-bit color
-/// mode, but this driver does not, so effectively U8 is Rgb332 and U16 is
-/// Rgb565. The built-in display RAM always uses 16 bits per pixel. When
-/// sending U8 data, the display controller fills in the lower bits. 16-bit
+/// mode, but this driver does not, so effectively 8-bit is Rgb332 and 16-bit
+/// is Rgb565. The built-in display RAM always uses 16 bits per pixel. When
+/// sending 8-bit data, the display controller fills in the lower bits. 16-bit
 /// pixels are always sent in big-endian order.
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum ColorMode {
-    U8 = 0x00,
-    U16 = 0x40, // Default after reset.
+pub enum BitDepth {
+    Eight = 0x00,
+    Sixteen = 0x40, // Default after reset.
 }
 
-impl ColorMode {
+impl BitDepth {
     pub fn bytes(&self) -> usize {
         match self {
-            Self::U8 => 1,
-            Self::U16 => 2,
+            Self::Eight => 1,
+            Self::Sixteen => 2,
         }
     }
 }
@@ -158,12 +158,6 @@ pub enum Error<PinE, SpiE> {
     Spi(SpiE),
 }
 
-impl<T, X> From<T> for Error<T, X> {
-    fn from(e: T) -> Self {
-        Error::Pin(e)
-    }
-}
-
 /// The implementation of the driver.
 ///
 /// Can be used with [`embedded-graphics`] crate in async frameworks (e.g.
@@ -187,7 +181,7 @@ pub struct Ssd1331<RST, DC, SPI> {
     dc: DC,
     spi: SPI,
 
-    color_mode: ColorMode,
+    bit_depth: BitDepth,
     area: Rectangle,
 
     command_buf: Vec<u8, 16>,
@@ -230,7 +224,7 @@ where
             dc,
             spi,
             data_mapping,
-            color_mode: ColorMode::U16,
+            bit_depth: BitDepth::Sixteen,
             area: Rectangle::zero(), // Just until init().
             command_buf: Vec::new(),
         };
@@ -243,25 +237,23 @@ where
     /// Hard-resets and re-initializes the display.
     ///
     /// Also clears the display RAM. This will take a few milliseconds.
+    /// Instances returned by [Self::new] are already initialized.
     pub async fn init(&mut self, delay: &mut impl DelayNs) -> Result<(), Error<PinE, SpiE>> {
         // Hold the display in reset for 1ms. Note that this does not seem to
         // clear the onboard RAM. The RST pin behaves as NRST (low level resets
         // the display).
-        self.rst.set_low()?;
+        self.rst.set_low().map_err(Error::Pin)?;
         delay.delay_ms(1).await;
-        self.rst.set_high()?;
+        self.rst.set_high().map_err(Error::Pin)?;
         delay.delay_ms(1).await;
 
-        self.area = Rectangle::new(
-            Point::zero(),
-            Size::new(DISPLAY_WIDTH, DISPLAY_HEIGHT),
-        );
-        self.color_mode = ColorMode::U16;
+        self.area = Rectangle::new(Point::zero(), Size::new(DISPLAY_WIDTH, DISPLAY_HEIGHT));
+        self.bit_depth = BitDepth::Sixteen;
 
         self.command_buf.clear();
 
         self.send_commands(&[
-            Command::RemapAndColorDepth(self.data_mapping, self.color_mode),
+            Command::RemapAndBitDepth(self.data_mapping, self.bit_depth),
             // Default is 15, results in grays saturating at about 50%.
             Command::MasterCurrent(5),
             // Default is 0x80 for all. Lowering the G channel seems to result
@@ -286,30 +278,31 @@ where
 
     /// Sends the data to the given area of the display's frame buffer.
     ///
-    /// The area is in your logical display coordinates; e.g if you use
-    /// [Config::ccw90], the logical size is (64, 96) and the (0, 0) is
-    /// the top-right corner of the un-rotated physical screen. Panics if the
-    /// area is empty or not completely contained within the display bounds.
-    /// You can fill the area using a smaller buffer by repeatedly calling
-    /// this method and passing the same `area`.
+    /// The `area` is in your logical display coordinates; e.g if you use
+    /// [Config::ccw90], the logical size is (64, 96) and the (0, 0) is the
+    /// top-right corner of the un-rotated physical screen.
     ///
-    /// Sending more data than fits in the area will wrap around and overwrite
-    /// the beginning of the area.
-    pub async fn write_data(
+    /// You can fill the area using a smaller buffer by repeatedly calling
+    /// this method and passing the same `area`. Sending more data than fits
+    /// in the area will wrap around and overwrite the beginning of the area.
+    ///
+    /// # Panics
+    ///
+    /// If the area is empty or not completely contained within the display
+    /// bounds.
+    pub async fn write_pixels(
         &mut self,
         data: &[u8],
-        color_mode: ColorMode,
+        bit_depth: BitDepth,
         area: Rectangle,
     ) -> Result<(), Error<PinE, SpiE>> {
         assert!(self.bounding_box().contains(area.top_left));
         assert!(self.bounding_box().contains(area.bottom_right().unwrap()));
         assert!(self.command_buf.is_empty());
-        if self.color_mode != color_mode {
-            self.color_mode = color_mode;
-            assert!(
-                Command::RemapAndColorDepth(self.data_mapping, self.color_mode)
-                    .push(&mut self.command_buf)
-            );
+        if self.bit_depth != bit_depth {
+            self.bit_depth = bit_depth;
+            assert!(Command::RemapAndBitDepth(self.data_mapping, self.bit_depth)
+                .push(&mut self.command_buf));
         }
         let ram_area = self.ram_area(area);
         if self.area != ram_area {
@@ -317,25 +310,10 @@ where
             assert!(Command::AddressRectangle(self.area).push(&mut self.command_buf));
         }
         self.flush_commands().await?;
-        self.dc.set_high()?;
+        self.dc.set_high().map_err(Error::Pin)?;
         self.spi.write(data).await.map_err(Error::Spi)?;
 
         Ok(())
-    }
-
-    /// Uses [Self::write_data] to write a framebuffer to the display.
-    ///
-    /// Maps (0, 0) of the framebuffer to the (0, 0) of the display, so this
-    /// is mostly useful for buffers that cover the whole display.
-    pub async fn write_all<C>(
-        &mut self,
-        fb: &Framebuffer<'_, C>,
-    ) -> Result<(), Error<PinE, SpiE>>
-    where
-        C: PixelColor + ToBytes,
-    {
-        self.write_data(fb.data(), fb.color_mode(), fb.bounding_box())
-            .await
     }
 
     // Returns display RAM rectangle for the given rectangle on the logical
@@ -366,7 +344,7 @@ where
 
     async fn flush_commands(&mut self) -> Result<(), Error<PinE, SpiE>> {
         if !self.command_buf.is_empty() {
-            self.dc.set_low()?;
+            self.dc.set_low().map_err(Error::Pin)?;
             self.spi
                 .write(&self.command_buf)
                 .await
@@ -377,5 +355,39 @@ where
     }
 }
 
-#[cfg(test)]
-mod tests {}
+/// Convenience trait to hide details of the driver type.
+///
+/// Once the display driver is created, only the error type depends on the HAL
+/// types used for the implementation. For the use cases where panic on error
+/// is acceptable, we can ignore the type parameters.
+#[allow(async_fn_in_trait)]
+pub trait WritePixels {
+    /// See [Ssd1331::write_pixels].
+    async fn write_pixels(&mut self, data: &[u8], bit_depth: BitDepth, area: Rectangle);
+
+    /// Transfers the contents of the framebuffer to the display.
+    async fn flush<C>(&mut self, fb: &Framebuffer<'_, C>, top_left: Point)
+    where
+        C: PixelColor + ToBytes,
+    {
+        self.write_pixels(
+            fb.data(),
+            fb.bit_depth(),
+            Rectangle::new(top_left, fb.size()),
+        )
+        .await
+    }
+}
+
+impl<RST, DC, SPI, PinE, SpiE> WritePixels for Ssd1331<RST, DC, SPI>
+where
+    RST: OutputPin<Error = PinE>,
+    DC: OutputPin<Error = PinE>,
+    SPI: SpiDevice<Error = SpiE>,
+{
+    async fn write_pixels(&mut self, data: &[u8], bit_depth: BitDepth, area: Rectangle) {
+        self.write_pixels(data, bit_depth, area)
+            .await
+            .unwrap_or_else(|_| panic!("write failed"))
+    }
+}
