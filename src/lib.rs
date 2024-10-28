@@ -361,7 +361,7 @@ where
 /// types used for the implementation. For the use cases where panic on error
 /// is acceptable, we can ignore the type parameters.
 #[allow(async_fn_in_trait)]
-pub trait WritePixels {
+pub trait WritePixels: OriginDimensions {
     /// See [Ssd1331::write_pixels].
     async fn write_pixels(&mut self, data: &[u8], bit_depth: BitDepth, area: Rectangle);
 
